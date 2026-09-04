@@ -11,7 +11,6 @@ const PASSWORD = '7337741654';
 
 app.get('/stream/:segment*', async (req, res) => {
   try {
-    // التقاط المسار كاملاً
     const path = req.params.segment + (req.params[0] || '');
     let targetUrl = '';
 
@@ -25,7 +24,7 @@ app.get('/stream/:segment*', async (req, res) => {
     }
 
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': '*/*',
       'Connection': 'keep-alive'
     };
@@ -35,14 +34,14 @@ app.get('/stream/:segment*', async (req, res) => {
       let playlist = response.data;
       const proxyHost = `${req.protocol}://${req.get('host')}`;
 
-      // استبدال المسارات النسبية والكاملة لتربط بالبروكسي
+      // توجيه كافة روابط المقاطع (.ts) لمرورها عبر البروكسي
       playlist = playlist.replace(/^(?!http)(.*\.ts)/gmb, `${proxyHost}/stream/$1`);
       playlist = playlist.replace(/^http:\/\/[^\/]+\/live\/[^\/]+\/[^\/]+\/(.*\.ts)/gmb, `${proxyHost}/stream/$1`);
 
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
       return res.send(playlist);
     } else {
-      // جلب مقاطع الـ TS كـ Stream وربطها بالاستجابة
+      // نقل بيانات مقاطع ts كـ stream مستمر
       const response = await axios.get(targetUrl, { headers, responseType: 'stream' });
       res.setHeader('Content-Type', 'video/mp2t');
       return response.data.pipe(res);
@@ -54,4 +53,4 @@ app.get('/stream/:segment*', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server ready on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
