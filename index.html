@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مشغل البث المباشر</title>
+  <!-- مكتبة HLS.js لتشغيل روابط m3u8 -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .player-container {
+      width: 100%;
+      max-width: 900px;
+      background: #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+    video {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      background-color: #000;
+    }
+    .player-title {
+      padding: 15px 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border-bottom: 1px solid #334155;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="player-container">
+    <div class="player-title">البث المباشر - القناة 746717</div>
+    <video id="video" controls autoplay playsinline></video>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    // رابط البث الخاص بك عبر سيرفر Render الجديد
+    const streamUrl = 'https://live26.onrender.com/stream/746717.m3u8';
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function() {
+        video.play().catch(e => console.log("التشغيل التلقائي يتطلب تفاعل المستخدم"));
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // لتشغيل البث على متصفحات Safari و iOS
+      video.src = streamUrl;
+      video.addEventListener('loadedmetadata', function() {
+        video.play();
+      });
+    }
+  </script>
+
+</body>
+</html>
