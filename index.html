@@ -9,105 +9,63 @@
         body {
             background-color: #0d1117;
             color: #ffffff;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: system-ui, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
         }
-        .container {
+        .card {
             width: 90%;
             max-width: 800px;
             background: #161b22;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             text-align: center;
         }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
+        video { width: 100%; border-radius: 8px; background: #000; }
         .badge {
-            background-color: #e3b341;
-            color: #000;
-            padding: 5px 12px;
+            display: inline-block;
+            padding: 5px 15px;
+            background: #238636;
             border-radius: 20px;
-            font-size: 0.9rem;
+            margin-bottom: 10px;
             font-weight: bold;
-        }
-        video {
-            width: 100%;
-            border-radius: 8px;
-            background: #000;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <h2>Alameeere TV - القناة</h2>
-        <span id="status" class="badge">جاري التحميل...</span>
-    </div>
-    <video id="video" controls playsinline poster=""></video>
+<div class="card">
+    <div class="badge" id="status">مباشر</div>
+    <video id="video" controls autoplay playsinline></video>
 </div>
 
 <script>
-    const streamUrl = 'https://live26.alameeeretv.workers.dev';
+    // الرابط المباشر الذي يعمل لديك
+    const directUrl = 'http://103.76.130.131:8080/live/0545580310/7337741654/746717.m3u8?token=ThdWW0NHBE1UFV4XAVNVQU8aWlpCD0JLHRFZV0BYCRwXUExGUlsWUF5ZRg8UCVcWWxoVF1IZQlwWXQJValAARlxWURANWxBVXRtGXVcXDEFZGgpWBgAHDAALWg4FUVRWDVEEAVJXAQ4AVgEFVVxWBwIPGxkVCEVmFlYQTUdRBF1QRxYIBxlHUEJHRg9YEQgPTxpUVE8+VVYKXQZaQV0KXkYXDgMbFwhWX14QWkQ7FAoHGgMXBFYBAFQAQRUXWwtvUVBZU1lRRwMTBkYZFBQNB0ECGwECWQMBVRFPG0ZAF1VUWGtbUxdfDgUBUwQBSEYXClVcFw1QAQFcBlUKAQFdHBdAR1dFagxdEw1VAwVUV1pWRQ==';
+
     const video = document.getElementById('video');
-    const statusBadge = document.getElementById('status');
 
     if (Hls.isSupported()) {
         const hls = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,
-            manifestLoadingTimeOut: 15000,
-            manifestLoadingMaxRetry: 5,
-            fragLoadingTimeOut: 20000,
-            fragLoadingMaxRetry: 5
-        });
-
-        hls.loadSource(streamUrl);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            if (statusBadge) {
-                statusBadge.style.backgroundColor = '#238636';
-                statusBadge.style.color = '#fff';
-                statusBadge.innerText = 'مباشر';
+            xhrSetup: function(xhr, url) {
+                // إجبار المتصفح على جلب الملفات مباشرة
             }
+        });
+        hls.loadSource(directUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
             video.play().catch(() => {
                 video.muted = true;
                 video.play();
             });
         });
-
-        hls.on(Hls.Events.ERROR, function (event, data) {
-            if (data.fatal) {
-                switch (data.type) {
-                    case Hls.ErrorTypes.NETWORK_ERROR:
-                        hls.startLoad();
-                        break;
-                    case Hls.ErrorTypes.MEDIA_ERROR:
-                        hls.recoverMediaError();
-                        break;
-                    default:
-                        if (statusBadge) {
-                            statusBadge.style.backgroundColor = '#da3633';
-                            statusBadge.style.color = '#fff';
-                            statusBadge.innerText = 'خطأ في جلب البث';
-                        }
-                        break;
-                }
-            }
-        });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = streamUrl;
-        video.addEventListener('loadedmetadata', function () {
+        video.src = directUrl;
+        video.addEventListener('loadedmetadata', function() {
             video.play();
         });
     }
