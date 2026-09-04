@@ -1,59 +1,56 @@
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors');
+
 const app = express();
+app.use(cors());
 
-const HOST = 'http://ahm79.store';
-const PORT = process.env.PORT || 3000;
+const STREAM_BASE = 'http://ahm79.store:8080';
+const USERNAME = '0545580310';
+const PASSWORD = '7337741654';
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
-
-const commonHeaders = {
-  'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
-  'Referer': `${HOST}/`,
-  'Origin': HOST
-};
-
-// 1. معالجة قطع الـ TS
-app.get('/ts/*', async (req, res) => {
+app.get('/stream/:channelId', async (req, res) => {
   try {
-    const tsPath = req.params[0];
-    const targetUrl = `${HOST}/${tsPath}`;
-    
-    const response = await axios.get(targetUrl, {
-      responseType: 'stream',
-      headers: commonHeaders
+    const { channelId } = req.params;
+    let targetUrl = '';
+
+    if (channelId.endsWith('.m3u8')) {
+      const idOnly = channelId.replace('.m3u8', '');
+      targetUrl = `${STREAM_BASE}/live/${USERNAME}/${PASSWORD}/${idOnly}.m3u8`;
+    } else {
+      targetUrl = `${STREAM_BASE}/live/${USERNAME}/${PASSWORD}/${channelId}`;
+    }
+
+    const response = await axios({
+      method: 'get',
+      url: targetUrl,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Connection': 'keep-alive'
+      },
+      responseType: channelId.endsWith('.m3u8') ? 'text' : 'stream',
     });
 
-    res.setHeader('Content-Type', 'video/mp2t');
-    response.data.pipe(res);
-  } catch (err) {
-    res.status(500).send('TS Fetch Error');
+    if (channelId.endsWith('.m3u8')) {
+      let playlist = response.data;
+      const proxyHost = `${req.protocol}://${req.get('host')}`;
+      
+      // تحويل جميع مسارات المقاطع النسبية داخل m3u8 لكي تمر عبر البروكسي
+      playlist = playlist.replace(/^(?!http)(.*\.ts)/gmb, `${proxyHost}/stream/$1`);
+      playlist = playlist.replace(/^(?!http)(.*\.m3u8)/gmb, `${proxyHost}/stream/$1`);
+
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+      return res.send(playlist);
+    } else {
+      res.setHeader('Content-Type', 'video/mp2t');
+      return response.data.pipe(res);
+    }
+  } catch (error) {
+    console.error('Proxy Error:', error.response ? error.response.status : error.message);
+    res.status(error.response ? error.response.status : 500).send(`M3U8 Error: ${error.message}`);
   }
 });
 
-// 2. معالجة ملف المانفيست M3U8
-app.get('/stream/:id', async (req, res) => {
-  try {
-    const id = req.params.id;
-    const targetUrl = `${HOST}/live/0545580310/7337741654/${id}`;
-
-    const response = await axios.get(targetUrl, { headers: commonHeaders });
-    let manifestText = response.data;
-
-    const serverOrigin = `${req.protocol}://${req.get('host')}`;
-    manifestText = manifestText.replace(/(\/hlsr\/[^\s\r\n]+)/g, `${serverOrigin}/ts$1`);
-
-    res.setHeader('Content-Type', 'application/x-mpegURL');
-    res.send(manifestText);
-  } catch (err) {
-    res.status(err.response?.status || 500).send('M3U8 Error: ' + err.message);
-  }
-});
-
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Proxy running on port ${PORT}`));
