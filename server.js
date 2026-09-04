@@ -1,56 +1,75 @@
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
-
-const app = express();
-app.use(cors());
-
 const STREAM_BASE = 'http://ahm79.store:8080';
 const USERNAME = '0545580310';
 const PASSWORD = '7337741654';
 
-app.get('/stream/:segment*', async (req, res) => {
-  try {
-    const path = req.params.segment + (req.params[0] || '');
-    let targetUrl = '';
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
 
+    // معالجة طلبات Preflight لفك حظر CORS
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        },
+      });
+    }
+
+    const path = url.pathname.replace(/^\/stream\//, '');
+
+    if (!path || path === '/') {
+      return new Response('Alameeere TV Proxy is Active', { status: 200 });
+    }
+
+    let targetUrl = '';
     if (path.endsWith('.m3u8')) {
       const idOnly = path.replace('.m3u8', '');
       targetUrl = `${STREAM_BASE}/live/${USERNAME}/${PASSWORD}/${idOnly}.m3u8`;
-    } else if (path.startsWith('http://') || path.startsWith('https://')) {
-      targetUrl = path;
+    } else if (path.includes('/live/')) {
+      targetUrl = `${STREAM_BASE}${path}`;
     } else {
       targetUrl = `${STREAM_BASE}/live/${USERNAME}/${PASSWORD}/${path}`;
     }
 
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-      'Connection': 'keep-alive'
-    };
+    try {
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': '*/*'
+        }
+      });
 
-    if (path.endsWith('.m3u8')) {
-      const response = await axios.get(targetUrl, { headers, responseType: 'text' });
-      let playlist = response.data;
-      const proxyHost = `${req.protocol}://${req.get('host')}`;
+      if (path.endsWith('.m3u8')) {
+        let text = await response.text();
+        const workerHost = `${url.protocol}//${url.host}`;
 
-      // توجيه كافة روابط المقاطع (.ts) لمرورها عبر البروكسي
-      playlist = playlist.replace(/^(?!http)(.*\.ts)/gmb, `${proxyHost}/stream/$1`);
-      playlist = playlist.replace(/^http:\/\/[^\/]+\/live\/[^\/]+\/[^\/]+\/(.*\.ts)/gmb, `${proxyHost}/stream/$1`);
+        // إعادة توجيه مقاطع .ts لتمر عبر البروكسي بنفس الطريقة
+        text = text.replace(/^(?!http)(.*\.ts)/gmb, `${workerHost}/stream/$1`);
+        text = text.replace(/^http:\/\/[^\/]+\/live\/[^\/]+\/[^\/]+\/(.*\.ts)/gmb, `${workerHost}/stream/$1`);
 
-      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-      return res.send(playlist);
-    } else {
-      // نقل بيانات مقاطع ts كـ stream مستمر
-      const response = await axios.get(targetUrl, { headers, responseType: 'stream' });
-      res.setHeader('Content-Type', 'video/mp2t');
-      return response.data.pipe(res);
+        return new Response(text, {
+          headers: {
+            'Content-Type': 'application/vnd.apple.mpegurl',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': '*',
+          }
+        });
+      }
+
+      const newHeaders = new Headers(response.headers);
+      newHeaders.set('Access-Control-Allow-Origin', '*');
+      newHeaders.set('Access-Control-Allow-Headers', '*');
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders
+      });
+
+    } catch (e) {
+      return new Response('Proxy Error: ' + e.message, { status: 500 });
     }
-  } catch (error) {
-    console.error('Proxy Error:', error.message);
-    res.status(500).send('Stream error');
   }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+};
